@@ -791,6 +791,61 @@ CXformUtils::ExistentialToAgg
 			);
 }
 
+void
+CXformUtils::ExistentialToLimit
+       (
+       IMemoryPool *pmp,
+       CExpression *pexprSubquery,
+       CExpression **ppexprNewSubquery, // output argument for new scalar subquery
+       CExpression **ppexprNewScalar   // output argument for new scalar expression
+       )
+{
+       GPOS_ASSERT(CUtils::FExistentialSubquery(pexprSubquery->Pop()));
+       GPOS_ASSERT(NULL != ppexprNewSubquery);
+       GPOS_ASSERT(NULL != ppexprNewScalar);
+
+       COperator::EOperatorId eopid = pexprSubquery->Pop()->Eopid();
+       CExpression *pexprInner = (*pexprSubquery)[0];
+       IMDType::ECmpType ecmptype = IMDType::EcmptG;
+       if (COperator::EopScalarSubqueryNotExists == eopid)
+       {
+               ecmptype = IMDType::EcmptEq;
+       }
+
+       pexprInner->AddRef();
+       CExpression *pexprLimit = CUtils::PexprLimit(pmp, pexprInner, 0, 1);
+
+       CMDAccessor *pmda = COptCtxt::PoctxtFromTLS()->Pmda();
+       CColumnFactory *pcf = COptCtxt::PoctxtFromTLS()->Pcf();
+
+       // create a int8 datum
+       const IMDTypeInt8 *pmdtypeint8 = pmda->PtMDType<IMDTypeInt8>();
+       IDatumInt8 *pdatum =  pmdtypeint8->PdatumInt8(pmp, 1 /* lVal */, false /* fNull */);
+       CExpression *pexprConst = GPOS_NEW(pmp) CExpression(pmp, GPOS_NEW(pmp) CScalarConst(pmp, (IDatum*) pdatum));
+
+       // create a int8 column reference
+       CColRef *pcrConst = pcf->PcrCreate(pmdtypeint8);
+
+       CExpression *pexprPrEl = GPOS_NEW(pmp) CExpression(pmp, GPOS_NEW(pmp) CScalarProjectElement(pmp, pcrConst), pexprConst);
+       CExpression *pexprInnerNew = GPOS_NEW(pmp) CExpression
+                                                                       (
+                                                                       pmp,
+                                                                       GPOS_NEW(pmp) CLogicalProject(pmp),
+                                                                       pexprLimit,
+                                                                       GPOS_NEW(pmp) CExpression(pmp, GPOS_NEW(pmp) CScalarProjectList(pmp), pexprPrEl)
+                                                                       );
+
+       *ppexprNewSubquery = GPOS_NEW(pmp) CExpression(pmp, GPOS_NEW(pmp) CScalarSubquery(pmp, pcrConst, true /*fGeneratedByExist*/, false /*fGeneratedByQuantified*/), pexprInnerNew);
+       *ppexprNewScalar =
+                       CUtils::PexprCmpWithZero
+                       (
+                       pmp,
+                       CUtils::PexprScalarIdent(pmp, pcrConst),
+                       pcrConst->Pmdtype()->Pmdid(),
+                       ecmptype
+                       );
+}
+
 
 //---------------------------------------------------------------------------
 //	@function:

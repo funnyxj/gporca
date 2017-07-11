@@ -138,7 +138,7 @@ CXformSimplifySubquery::FSimplifyExistential
 
 	CExpression *pexprNewSubquery = NULL;
 	CExpression *pexprCmp = NULL;
-	CXformUtils::ExistentialToAgg(pmp, pexprScalar, &pexprNewSubquery, &pexprCmp);
+	CXformUtils::ExistentialToLimit(pmp, pexprScalar, &pexprNewSubquery, &pexprCmp);
 
 	// create a comparison predicate involving subquery expression
 	DrgPexpr *pdrgpexpr = GPOS_NEW(pmp) DrgPexpr(pmp);

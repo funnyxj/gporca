@@ -723,6 +723,16 @@ namespace gpopt
 				CExpression **ppexprNewScalar
 				);
 			
+			// helper for creating LIMIT expression equivalent to existential subquery
+			static
+			void ExistentialToLimit
+				(
+				IMemoryPool *pmp,
+				CExpression *pexprSubquery,
+				CExpression **ppexprNewSubquery,
+				CExpression **ppexprNewScalar
+				);
+
 			// create a logical assert for the check constraints on the given table
 			static
 			CExpression *PexprAssertConstraints
